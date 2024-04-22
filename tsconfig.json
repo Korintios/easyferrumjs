@@ -1,0 +1,15 @@
+{
+  "compilerOptions": {
+    "target": "ES2015",                                 
+    "module": "commonjs",                              
+    "outDir": "./dist",                                 
+    "esModuleInterop": true,                       
+    "forceConsistentCasingInFileNames": true,      
+    "noImplicitReturns": false
+    /* "paths": {
+      "@models/*": ["./types/*"],
+      "@utils/*": ["./utils/*"],
+    }   */              
+    
+  }
+}

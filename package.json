@@ -1,0 +1,18 @@
+{
+  "name": "easyferrumjs",
+  "version": "0.1.2",
+  "description": "Get easy information about the application web ferrum.",
+  "main": "dist/index.js",
+  "author": "Develop with Milo",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Korintios/easyferrumjs"
+  },
+  "scripts": {
+    "test": "tsc & node dist/index.js"
+  },
+  "dependencies": {
+    "puppeteer": "^22.6.3"
+  }
+}
