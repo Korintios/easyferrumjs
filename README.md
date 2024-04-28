@@ -11,18 +11,23 @@ Ferrum es una aplicación web de la universidad tecnológico comfenalco la cual 
 ```js
 import { LoginData } from "./types/LoginData"
 import { FerrumUser } from "./utils/User"
+import { configDotenv } from "dotenv"
+configDotenv()
 
 const newUser: LoginData = {
-    user: process.env.USERNAME,
-    password: process.env.PASSWORD
+    user: process.env.FERRUM_USER,
+    password: process.env.FERRUM_PASS
 }
 
 async function fetchUserInfo() {
     try {
         const ferrumUser = new FerrumUser(newUser);
         await ferrumUser.InitPage();
-        const userInfo = await ferrumUser.getUserInfo();
+        const userInfo = await ferrumUser.getUserInfo()
+        const userHomeworks = await ferrumUser.getHomeworks()
         console.log(userInfo)
+        console.log(ferrumUser.studentCode)
+        console.log(userHomeworks)
     } catch (error) {
         console.error("Error al obtener la información del usuario:", error);
     }
@@ -30,3 +35,13 @@ async function fetchUserInfo() {
 
 fetchUserInfo()
 ```
+
+## Información Detallada.
+| Funcionalidad | Tipo | Descripción. |
+|-|-|-|
+| **FerrumUser**   | Clase | Clase principal la cual se crea a partir de un diccionario con un usuario y contraseña.   |
+| **studentCode**    | Atributo | Código de estudiante de la plataforma ferrum.   |
+| **InitPage**    | Método | Inicializar el usuario dentro de la plataforma.   |
+| **getUserInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
+| **getUserInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
+| **getHomeworks**    | Método | Obtener todas las tareas disponibles dentro de la plataforma ferrum.   |

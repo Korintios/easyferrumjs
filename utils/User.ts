@@ -9,6 +9,7 @@ type FerrumPage = Page | undefined
 export class FerrumUser {
 	private loginData: LoginData
 	private currentPage: FerrumPage
+	studentCode: string
 
 	constructor(loginData: LoginData) {
 		this.loginData = loginData
@@ -77,7 +78,6 @@ export class FerrumUser {
 	public async getUserInfo(): Promise<UserInfo | any> {
 		return await this.executePage(async () => {
 			await this.currentPage.goto(CURRENT_PAGE + "user/profile.php");
-
 			const userData = await this.currentPage.evaluate(() => {
 				// Obtenemos los intereses del usuario.
 				let interestsList: Array<string> = [];
@@ -93,6 +93,9 @@ export class FerrumUser {
 					id: document.querySelector(".idnumber")?.querySelector("dd")?.innerText || "Vació",
 				};
 			});
+
+			// Asignamos código de estudiante.
+			this.studentCode = userData.id
 
 			// Accedemos a la sección de carreras.
 			await this.currentPage.click('[for="coursedetails"]');
@@ -134,8 +137,53 @@ export class FerrumUser {
 	 * @returns Array of the homeworks
 	*/
 	public async getHomeworks(): Promise<Array<Homework>> {
-		//const pageLoaded: Page = await this.loginPage();
-		return [];
+		return await this.executePage(async () => {
+			await this.currentPage.goto(CURRENT_PAGE + "calendar/view.php");
+			const homeworkData = this.currentPage.evaluate(() => {
+				const homeworks: Array<any> = []
+				document.querySelectorAll(".event").forEach((e) => {
+
+					function getContainerInformation(container: NodeListOf<Element>, isQuery: boolean, position: number, tag: string): string {
+						return isQuery === false
+						? container[position].querySelectorAll<HTMLDivElement>(tag)[1].innerText
+						: container[container.length - 1].querySelector<HTMLDivElement>(tag).innerText
+					}
+
+					function optimizeText(text: string) {
+						// Eliminar líneas en blanco adicionales
+						text = text.replace(/^\s*[\r\n]/gm, '');
+						// Reemplazar múltiples espacios en blanco por uno solo
+						text = text.replace(/\s{2,}/g, ' ');
+						return text;
+					}
+
+					// Esquema de la tarea.
+					const homework: Homework = {
+						title: "",
+						course: "",
+						sendDate: "",
+						status: "",
+						description: ""
+					}
+
+					// Obtenemos la información del contenedor de las tareas.
+					const containerInfo = e.querySelector(".description").querySelectorAll(".row")
+					homework.title = e.querySelector(".name").innerHTML
+					homework.sendDate = getContainerInformation(containerInfo, false, 0, "div") //containerInfo[0].querySelectorAll("div")[1].innerText
+					homework.status = getContainerInformation(containerInfo, false, 1, "div") //containerInfo[1].querySelectorAll("div")[1].innerText
+					homework.course = getContainerInformation(containerInfo, true, 0, "a") //containerInfo[containerInfo.length - 1].querySelector("a").innerText
+					homework.description = e.querySelector<HTMLDivElement>(".description-content")?.innerText
+
+					//* Formateamos la descripción si existe.
+					if (homework.description) {
+						homework.description = optimizeText(homework.description)
+					}
+					homeworks.push(homework)
+				})
+				return homeworks
+			})
+			return homeworkData
+		})
 	}
 }
 

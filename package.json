@@ -1,6 +1,6 @@
 {
   "name": "easyferrumjs",
-  "version": "0.1.2",
+  "version": "0.3.0",
   "description": "Get easy information about the application web ferrum.",
   "main": "dist/index.js",
   "author": "Develop with Milo",
@@ -13,6 +13,7 @@
     "test": "tsc & node dist/index.js"
   },
   "dependencies": {
+    "dotenv": "^16.4.5",
     "puppeteer": "^22.6.3"
   }
 }

@@ -1,7 +1,9 @@
+type ferrumString = string | undefined
+
 export interface Homework {
-    title: string
-    course: string
-    sendDate: Date 
-    status: string
-    description: string
+    title: ferrumString
+    course: ferrumString
+    sendDate: ferrumString
+    status: ferrumString
+    description?: ferrumString
 }
