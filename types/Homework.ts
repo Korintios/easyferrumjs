@@ -1,4 +1,5 @@
-type ferrumString = string | undefined
+type ferrumString = string
+type ferrumTaskType = "Tarea" | "Evaluación" | "Auto Evaluación"
 
 export interface Homework {
     title: ferrumString
@@ -6,4 +7,14 @@ export interface Homework {
     sendDate: ferrumString
     status: ferrumString
     description?: ferrumString
+    type: ferrumTaskType
+    id: ferrumString
+    info?: HomeworkInfo
+}
+
+export interface HomeworkInfo {
+    timeLeft?: ferrumString
+    taskScore?: ferrumString
+    statusSend?: ferrumString
+    lastModification?: ferrumString
 }

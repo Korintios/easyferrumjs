@@ -1,9 +1,11 @@
 import puppeteer, { Page } from "puppeteer";
-import { Homework } from "../types/Homework";
+import { Homework, HomeworkInfo } from "../types/Homework";
 import { UserInfo } from "../types/UserInfo";
 import { LoginData } from "../types/LoginData";
 
 const CURRENT_PAGE = "https://ferrum.tecnologicocomfenalco.edu.co/ferrum/";
+const HOMEWORK_PAGE = CURRENT_PAGE + "mod/assign/view.php?id="
+const QUIZ_PAGE = CURRENT_PAGE + "mod/quiz/view.php?id="
 type FerrumPage = Page | undefined
 
 export class FerrumUser {
@@ -19,17 +21,13 @@ export class FerrumUser {
 	 * Init the browser and Login in to the ferrum app.
 	*/ 
 	public async InitPage() {
-		console.info("Inicializando Pagina")
+		console.info("Iniciando Sesión...")
 		// Declaramos el buscador.
 		let newBrowser = await puppeteer.launch({
 			headless: true
 		})
 		// Abrimos una nueva pagina con el buscador.
 		this.currentPage = await newBrowser.newPage()
-
-		console.log("Pagina Declarada")
-		console.log("Pagina: " + this.currentPage)
-
 
 		//! Configuración
 		const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36";
@@ -53,7 +51,7 @@ export class FerrumUser {
 		} catch (err) {
 			throw err
 		}
-		console.log("Pagina Inicializada")
+		console.info("Sesión Establecida.")
 
 
 	}
@@ -143,12 +141,6 @@ export class FerrumUser {
 				const homeworks: Array<any> = []
 				document.querySelectorAll(".event").forEach((e) => {
 
-					function getContainerInformation(container: NodeListOf<Element>, isQuery: boolean, position: number, tag: string): string {
-						return isQuery === false
-						? container[position].querySelectorAll<HTMLDivElement>(tag)[1].innerText
-						: container[container.length - 1].querySelector<HTMLDivElement>(tag).innerText
-					}
-
 					function optimizeText(text: string) {
 						// Eliminar líneas en blanco adicionales
 						text = text.replace(/^\s*[\r\n]/gm, '');
@@ -157,13 +149,21 @@ export class FerrumUser {
 						return text;
 					}
 
+					function getContainerInformation(container: NodeListOf<Element>, isQuery: boolean, position: number, tag: string): string {
+						return isQuery === false
+						? container[position].querySelectorAll<HTMLDivElement>(tag)[1].innerText
+						: container[container.length - 1].querySelector<HTMLDivElement>(tag).innerText
+					}
+
 					// Esquema de la tarea.
 					const homework: Homework = {
 						title: "",
 						course: "",
 						sendDate: "",
 						status: "",
-						description: ""
+						description: "",
+						type: "Tarea",
+						id: ""
 					}
 
 					// Obtenemos la información del contenedor de las tareas.
@@ -173,6 +173,16 @@ export class FerrumUser {
 					homework.status = getContainerInformation(containerInfo, false, 1, "div") //containerInfo[1].querySelectorAll("div")[1].innerText
 					homework.course = getContainerInformation(containerInfo, true, 0, "a") //containerInfo[containerInfo.length - 1].querySelector("a").innerText
 					homework.description = e.querySelector<HTMLDivElement>(".description-content")?.innerText
+					homework.id = e.querySelector<HTMLAreaElement>(".card-footer a")?.href
+
+					//* Ajustamos la id para que solo sean los números.
+					homework.id = homework.id.match(/\d+/g).join("");
+
+
+					//* Aplicamos la tarea según su tipo.
+					if (homework.title.includes("Auto-Evaluación")) {
+						homework.type = "Auto Evaluación"
+					}
 
 					//* Formateamos la descripción si existe.
 					if (homework.description) {
@@ -183,6 +193,28 @@ export class FerrumUser {
 				return homeworks
 			})
 			return homeworkData
+		})
+	}
+
+	public async getStateHomework(homework: Homework): Promise<Homework> {
+		return await this.executePage(async() => {
+			if (homework.type === "Tarea") {
+				await this.currentPage.goto(HOMEWORK_PAGE + homework.id)
+				const additionalHomeworkData = await this.currentPage.evaluate(() => {
+					const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr")
+					const additionalData = {
+						statusSend: containerInfo[0].querySelector("td").innerText,
+						taskScore: containerInfo[1].querySelector("td").innerText,
+						timeLeft: containerInfo[3].querySelector("td").innerText,
+						lastModification: containerInfo[4].querySelector("td").innerText
+					}
+					return additionalData
+				})
+				return {
+					...homework,
+					info: additionalHomeworkData
+				}
+			}
 		})
 	}
 }

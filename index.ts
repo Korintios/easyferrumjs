@@ -13,13 +13,10 @@ async function fetchUserInfo() {
     try {
         const ferrumUser = new FerrumUser(newUser);
         await ferrumUser.InitPage();
-        const userInfo = await ferrumUser.getUserInfo()
-        const userHomeworks = await ferrumUser.getHomeworks()
-        console.log(userInfo)
-        console.log(ferrumUser.studentCode)
+        const userHomeworks = await ferrumUser.getUserInfo()
         console.log(userHomeworks)
     } catch (error) {
-        console.error("Error al obtener la información del usuario:", error);
+        console.error("Error in FerrumJS", error);
     }
 }
 
