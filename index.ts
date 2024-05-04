@@ -11,16 +11,19 @@ const newUser: LoginData = {
 
 async function fetchUserInfo() {
     try {
+        //! Inicializamos
         const ferrumUser = new FerrumUser(newUser);
         await ferrumUser.InitPage();
+
+        //! Obtenemos información de Usuario.
         console.log(ferrumUser.userInfo)
+
+        //! Obtenemos las tareas parametrizadas a nuestras necesidades.
         console.log("Tareas")
         const allTasksPending = await ferrumUser.getHomeworks("Pending")
         const allTasksSend = await ferrumUser.getHomeworks("Send")
         const allTasks = await ferrumUser.getHomeworks("All")
         console.log(allTasks)
-        console.log("Auto Evaluaciones")
-        console.log(ferrumUser.autoReviews)
     } catch (error) {
         console.error("Error in FerrumJS", error);
     }

@@ -10,7 +10,7 @@ Ferrum es una aplicación web de la universidad tecnológico comfenalco la cual 
 
 ```js
 import { LoginData } from "./types/LoginData"
-import { FerrumUser } from "./utils/User"
+import { FerrumUser } from "./models/User"
 import { configDotenv } from "dotenv"
 configDotenv()
 
@@ -21,15 +21,21 @@ const newUser: LoginData = {
 
 async function fetchUserInfo() {
     try {
+        // Inicializamos
         const ferrumUser = new FerrumUser(newUser);
         await ferrumUser.InitPage();
-        const userInfo = await ferrumUser.getUserInfo()
-        const userHomeworks = await ferrumUser.getHomeworks()
-        console.log(userInfo)
-        console.log(ferrumUser.studentCode)
-        console.log(userHomeworks)
+
+        // Obtenemos información de Usuario.
+        console.log(ferrumUser.userInfo)
+
+        // Obtenemos las tareas parametrizadas a nuestras necesidades.
+        console.log("Tareas")
+        const allTasksPending = await ferrumUser.getHomeworks("Pending")
+        const allTasksSend = await ferrumUser.getHomeworks("Send")
+        const allTasks = await ferrumUser.getHomeworks("All")
+        console.log(allTasks)
     } catch (error) {
-        console.error("Error al obtener la información del usuario:", error);
+        console.error("Error in FerrumJS", error);
     }
 }
 
