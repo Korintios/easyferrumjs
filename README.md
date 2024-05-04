@@ -40,8 +40,7 @@ fetchUserInfo()
 | Funcionalidad | Tipo | Descripción. |
 |-|-|-|
 | **FerrumUser**   | Clase | Clase principal la cual se crea a partir de un diccionario con un usuario y contraseña.   |
-| **studentCode**    | Atributo | Código de estudiante de la plataforma ferrum.   |
 | **InitPage**    | Método | Inicializar el usuario dentro de la plataforma.   |
-| **getUserInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
-| **getUserInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
-| **getHomeworks**    | Método | Obtener todas las tareas disponibles dentro de la plataforma ferrum.   |
+| **studentCode**    | Atributo | Código de estudiante de la plataforma ferrum.   |
+| **userInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
+| **getHomeworks**    | Método | Obtener todas las tareas parametrizadas disponibles dentro de la plataforma ferrum.   |

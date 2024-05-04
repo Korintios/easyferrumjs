@@ -1,7 +1,8 @@
 import puppeteer, { Page } from "puppeteer";
-import { Homework, HomeworkInfo } from "../types/Homework";
+import { Homework, TaskStatus } from "../types/Homework";
 import { UserInfo } from "../types/UserInfo";
 import { LoginData } from "../types/LoginData";
+import { validateTaskStatus } from "../utils/validateTaskStatus";
 
 const CURRENT_PAGE = "https://ferrum.tecnologicocomfenalco.edu.co/ferrum/";
 const HOMEWORK_PAGE = CURRENT_PAGE + "mod/assign/view.php?id="
@@ -12,6 +13,9 @@ export class FerrumUser {
 	private loginData: LoginData
 	private currentPage: FerrumPage
 	studentCode: string
+	userInfo: UserInfo
+	private homeworks: Array<Homework>
+	autoReviews: Array<Homework>
 
 	constructor(loginData: LoginData) {
 		this.loginData = loginData
@@ -48,10 +52,21 @@ export class FerrumUser {
 			if (alertDanger) {
 				throw new Error("The user or password is incorrect.")
 			}
+
+			//! Cargamos Datos de Usuario.
+			console.log("Cargando Datos...")
+			this.userInfo = await this.getUserInfo()
+			const DATA = await this.getAllData()
+			this.homeworks = DATA[0]
+			this.autoReviews = DATA[1]
+			console.log("Datos Cargados.")
+
 		} catch (err) {
 			throw err
 		}
 		console.info("Sesión Establecida.")
+		
+		
 
 
 	}
@@ -73,22 +88,22 @@ export class FerrumUser {
 	 * Get all information about the user in the ferrum app.
 	 * @returns All info about the user.
 	*/
-	public async getUserInfo(): Promise<UserInfo | any> {
+	private async getUserInfo(): Promise<UserInfo | any> {
 		return await this.executePage(async () => {
 			await this.currentPage.goto(CURRENT_PAGE + "user/profile.php");
 			const userData = await this.currentPage.evaluate(() => {
 				// Obtenemos los intereses del usuario.
 				let interestsList: Array<string> = [];
-				document.querySelector(".tag_list")?.querySelector(".inline-list")?.querySelectorAll("li").forEach((li) => {
+				document.querySelectorAll<HTMLDataListElement>(".tag_list .inline-list li").forEach((li) => {
 					interestsList.push(li.innerText);
 				});
 
 				return {
-					fullname: document.querySelector(".fullname")?.querySelector("span")?.innerText || "Vació",
-					email: document.querySelector(".email")?.querySelector("dd")?.innerText || "Vació",
-					city: document.querySelector(".city")?.querySelector("dd")?.innerText || "Vació",
+					fullname: document.querySelector<HTMLDivElement>(".fullname span").innerText || "",
+					email: document.querySelector<HTMLDivElement>(".email dd").innerText || "",
+					city: document.querySelector<HTMLDivElement>(".city dd").innerText || "",
 					interests: interestsList,
-					id: document.querySelector(".idnumber")?.querySelector("dd")?.innerText || "Vació",
+					id: document.querySelector<HTMLDivElement>(".idnumber dd").innerText || "",  
 				};
 			});
 
@@ -100,7 +115,7 @@ export class FerrumUser {
 			const coursesData = await this.currentPage.evaluate(() => {
 				// Obtenemos sus carreras.
 				let coursesList: Array<string> = [];
-				let coursesElements = document.querySelector(".coursedetails")?.querySelectorAll("li")
+				let coursesElements = document.querySelectorAll<HTMLDataListElement>(".coursedetails li")
 				if (coursesElements) {
 					// Removemos el primer elemento que es una cadena conjunta.
 					const arrayCourses = Array.from(coursesElements)
@@ -116,8 +131,8 @@ export class FerrumUser {
 			await this.currentPage.click('[for="more"]');
 			const accessData = await this.currentPage.evaluate(() => {
 				return {
-					firstAccess: document.querySelector(".firstaccess")?.querySelector("dd")?.innerText || "",
-					lastAccess: document.querySelector(".lastaccess")?.querySelector("dd")?.innerText || "",
+					firstAccess: document.querySelector<HTMLDivElement>(".firstaccess dd").innerText || "",
+					lastAccess: document.querySelector<HTMLDivElement>(".lastaccess dd").innerText || "",
 				};
 			});
 
@@ -134,11 +149,12 @@ export class FerrumUser {
 	 * Get all information about homeworks from the user in the ferrum app.
 	 * @returns Array of the homeworks
 	*/
-	public async getHomeworks(): Promise<Array<Homework>> {
+	private async getAllData(): Promise<Array<Homework[]>> {
 		return await this.executePage(async () => {
 			await this.currentPage.goto(CURRENT_PAGE + "calendar/view.php");
-			const homeworkData = this.currentPage.evaluate(() => {
-				const homeworks: Array<any> = []
+			const Data = this.currentPage.evaluate(() => {
+				const homeworks: Array<Homework> = []
+				const autoReviews: Array<Homework> = []
 				document.querySelectorAll(".event").forEach((e) => {
 
 					function optimizeText(text: string) {
@@ -188,35 +204,72 @@ export class FerrumUser {
 					if (homework.description) {
 						homework.description = optimizeText(homework.description)
 					}
-					homeworks.push(homework)
+
+					if (homework.type === "Tarea") {
+						homeworks.push(homework)
+					} else if (homework.type === "Auto Evaluación") {
+						autoReviews.push(homework)
+					}
+
 				})
-				return homeworks
+				return [homeworks, autoReviews]
 			})
-			return homeworkData
+			return Data
 		})
 	}
 
-	public async getStateHomework(homework: Homework): Promise<Homework> {
-		return await this.executePage(async() => {
-			if (homework.type === "Tarea") {
-				await this.currentPage.goto(HOMEWORK_PAGE + homework.id)
-				const additionalHomeworkData = await this.currentPage.evaluate(() => {
-					const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr")
-					const additionalData = {
-						statusSend: containerInfo[0].querySelector("td").innerText,
-						taskScore: containerInfo[1].querySelector("td").innerText,
-						timeLeft: containerInfo[3].querySelector("td").innerText,
-						lastModification: containerInfo[4].querySelector("td").innerText
+	/**
+	 * 
+	 * @param homeworks A homeworks array with additional data.
+	 * @returns 
+	 */
+	private async setStateOnHomeworks(): Promise<Array<Homework>> {
+		return await this.executePage(async () => {
+			const allTasks = this.homeworks.filter((task) => task.type === "Tarea");
+			const allTasksWithStatus = [];
+	
+			for (const task of allTasks) {
+				await this.currentPage.goto(HOMEWORK_PAGE + task.id);
+				const updatedTask = await this.currentPage.evaluate((task) => {
+					const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
+					const statusSend = containerInfo[0].querySelector("td").innerText;
+					if (!statusSend) {
+						task.statusSend = "Desconocido";
+					} else {
+						task.statusSend = statusSend as TaskStatus;
 					}
-					return additionalData
-				})
-				return {
-					...homework,
-					info: additionalHomeworkData
-				}
+					task.taskScore = containerInfo[1].querySelector("td").innerText;
+					task.timeLeft = containerInfo[3].querySelector("td").innerText;
+					task.lastModification = containerInfo[4].querySelector("td").innerText;
+
+					return task;
+				}, task);
+				allTasksWithStatus.push(updatedTask);
 			}
-		})
+			return allTasksWithStatus;
+		});
 	}
+
+	public async getHomeworks(filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
+		// Obtener todos los deberes con su estado actualizado
+		const allHomeworksWithStatus = await this.setStateOnHomeworks();
+		
+		let filteredHomeworks: Array<Homework> = [];
+	
+		// Filtrar los deberes según el filtro especificado
+		if (filter === "Pending") {
+			// Filtrar deberes pendientes
+			filteredHomeworks = allHomeworksWithStatus.filter(task => task.statusSend === "No entregado");
+			return filteredHomeworks
+		} else if (filter === "Send") {
+			// Filtrar deberes enviados para calificar
+			filteredHomeworks = allHomeworksWithStatus.filter(task => task.statusSend === "Enviado para calificar");
+			return filteredHomeworks
+		}
+
+		return allHomeworksWithStatus
+	}
+	
 }
 
 

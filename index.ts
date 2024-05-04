@@ -1,6 +1,6 @@
 
 import { LoginData } from "./types/LoginData"
-import { FerrumUser } from "./utils/User"
+import { FerrumUser } from "./models/User"
 import { configDotenv } from "dotenv"
 configDotenv()
 
@@ -13,8 +13,14 @@ async function fetchUserInfo() {
     try {
         const ferrumUser = new FerrumUser(newUser);
         await ferrumUser.InitPage();
-        const userHomeworks = await ferrumUser.getUserInfo()
-        console.log(userHomeworks)
+        console.log(ferrumUser.userInfo)
+        console.log("Tareas")
+        const allTasksPending = await ferrumUser.getHomeworks("Pending")
+        const allTasksSend = await ferrumUser.getHomeworks("Send")
+        const allTasks = await ferrumUser.getHomeworks("All")
+        console.log(allTasks)
+        console.log("Auto Evaluaciones")
+        console.log(ferrumUser.autoReviews)
     } catch (error) {
         console.error("Error in FerrumJS", error);
     }
