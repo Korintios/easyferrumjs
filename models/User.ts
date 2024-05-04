@@ -250,6 +250,11 @@ export class FerrumUser {
 		});
 	}
 
+	/**
+	 * Get all homeworks in differents parametters.
+	 * @param filter Filter depends the homeworks you will get.
+	 * @returns 
+	 */
 	public async getHomeworks(filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
 		// Obtener todos los deberes con su estado actualizado
 		const allHomeworksWithStatus = await this.setStateOnHomeworks();
@@ -269,7 +274,43 @@ export class FerrumUser {
 
 		return allHomeworksWithStatus
 	}
-	
+
+	public async getHomeworkInfo(id: string): Promise<Homework> {
+		await this.currentPage.goto(HOMEWORK_PAGE + id);
+
+		const homeworkData: Homework = await this.currentPage.evaluate((id) => {
+
+			const homework: Homework = {
+				id: id,
+				title: "",
+				type: "Tarea",
+				course: "",
+				taskScore: "",
+				sendDate: "",
+				timeLeft: "",
+				statusSend: "Desconocido",
+				lastModification: ""
+			}
+			
+			homework.title = document.querySelector<HTMLDivElement>("[role=main] h2").innerText
+			homework.course = document.querySelectorAll<HTMLDivElement>(".breadcrumb li")[1].innerText
+			const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
+			const statusSend = containerInfo[0].querySelector("td").innerText;
+			if (!statusSend) {
+				homework.statusSend = "Desconocido";
+			} else {
+				homework.statusSend = statusSend as TaskStatus;
+			}
+			homework.taskScore = containerInfo[1].querySelector("td").innerText;
+			homework.sendDate = document.querySelectorAll<HTMLDivElement>(".generaltable tr td")[2].innerText
+			homework.timeLeft = containerInfo[3].querySelector("td").innerText;
+			homework.lastModification = containerInfo[4].querySelector("td").innerText;
+
+			return homework
+		}, id);
+
+		return homeworkData
+	}
 }
 
 

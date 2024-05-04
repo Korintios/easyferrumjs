@@ -34,6 +34,10 @@ async function fetchUserInfo() {
         const allTasksSend = await ferrumUser.getHomeworks("Send")
         const allTasks = await ferrumUser.getHomeworks("All")
         console.log(allTasks)
+
+        // Obtenemos el estado de alguna tarea.
+        const task = await ferrumUser.getHomeworkInfo("1370701")
+        console.log(task)
     } catch (error) {
         console.error("Error in FerrumJS", error);
     }
@@ -50,3 +54,5 @@ fetchUserInfo()
 | **studentCode**    | Atributo | Código de estudiante de la plataforma ferrum.   |
 | **userInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
 | **getHomeworks**    | Método | Obtener todas las tareas parametrizadas disponibles dentro de la plataforma ferrum.   |
+| **getHomeworkInfo**    | Método | Obtener información de una tarea en especifico.   |
+

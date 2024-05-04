@@ -4,11 +4,11 @@ export type TaskStatus = "Enviado para calificar" | "No entregado" | "Desconocid
 
 
 export interface Homework {
-    id: ferrumString
+    id?: ferrumString
     title: ferrumString
     course: ferrumString
     sendDate: ferrumString
-    status: ferrumString
+    status?: ferrumString
     description?: ferrumString
     type: ferrumTaskType
     timeLeft?: ferrumString
