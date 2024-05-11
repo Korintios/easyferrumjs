@@ -2,12 +2,22 @@ import puppeteer, { Page } from "puppeteer";
 import { Homework, TaskStatus } from "../types/Homework";
 import { UserInfo } from "../types/UserInfo";
 import { LoginData } from "../types/LoginData";
-import { validateTaskStatus } from "../utils/validateTaskStatus";
 
 const CURRENT_PAGE = "https://ferrum.tecnologicocomfenalco.edu.co/ferrum/";
 const HOMEWORK_PAGE = CURRENT_PAGE + "mod/assign/view.php?id="
 const QUIZ_PAGE = CURRENT_PAGE + "mod/quiz/view.php?id="
 type FerrumPage = Page | undefined
+
+const DEFAULT_HOMEWORK: Homework = {
+	title: "",
+	type: "Tarea",
+	course: "",
+	taskScore: "",
+	sendDate: "",
+	timeLeft: "",
+	statusSend: "Desconocido",
+	lastModification: ""
+}
 
 export class FerrumUser {
 	private loginData: LoginData
@@ -25,51 +35,50 @@ export class FerrumUser {
 	 * Init the browser and Login in to the ferrum app.
 	*/ 
 	public async InitPage() {
-		console.info("Iniciando Sesión...")
-		// Declaramos el buscador.
-		let newBrowser = await puppeteer.launch({
-			headless: true
-		})
-		// Abrimos una nueva pagina con el buscador.
-		this.currentPage = await newBrowser.newPage()
-
-		//! Configuración
-		const ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36";
-		await this.currentPage.setUserAgent(ua)
-		await this.currentPage.setViewport({width: 1080, height: 1024});
-
-		// Accedemos al método goto para abrir la pagina en nuestro buscador.
-		await this.currentPage.goto(CURRENT_PAGE);
-
+		console.info("Iniciando Sesión...");
+	
 		try {
-			// Iniciamos sesión.
-			await this.currentPage.waitForSelector("#pre-login-form");
-			await this.currentPage.type('[name="username"]', this.loginData.user);
-			await this.currentPage.type('[name="password"]', this.loginData.password);
-			await this.currentPage.click(".btn-login");
-
-			const alertDanger = await this.currentPage.$('.alert-danger')
+			const browser = await puppeteer.launch({ headless: true });
+			const page = await browser.newPage();
+	
+			// Configuración de la página
+			const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36";
+			await page.setUserAgent(userAgent);
+			await page.setViewport({ width: 1080, height: 1024 });
+	
+			// Navegar a la página de inicio
+			await page.goto(CURRENT_PAGE);
+	
+			// Esperar hasta que aparezca el formulario de inicio de sesión
+			await page.waitForSelector("#pre-login-form");
+	
+			// Iniciar sesión
+			await page.type('[name="username"]', this.loginData.user);
+			await page.type('[name="password"]', this.loginData.password);
+			await page.click(".btn-login");
+	
+			// Verificar si hay un mensaje de error
+			const alertDanger = await page.$('.alert-danger');
 			if (alertDanger) {
-				throw new Error("The user or password is incorrect.")
+				throw new Error("El usuario o la contraseña son incorrectos.");
 			}
 
-			//! Cargamos Datos de Usuario.
-			console.log("Cargando Datos...")
-			this.userInfo = await this.getUserInfo()
-			const DATA = await this.getAllData()
-			this.homeworks = DATA[0]
-			this.autoReviews = DATA[1]
-			console.log("Datos Cargados.")
-
+			// Asignamos la pagina dentro del atributo del objeto.
+			this.currentPage = page
+	
+			// Cargar datos de usuario y tareas
+			this.userInfo = await this.getUserInfo();
+			const data = await this.getAllData();
+			this.homeworks = data.homeworks;
+			this.autoReviews = data.autoReviews;
+	
+			console.info("Sesión Establecida.");
 		} catch (err) {
-			throw err
+			console.error("Error al iniciar sesión:", err);
+			throw err;
 		}
-		console.info("Sesión Establecida.")
-		
-		
-
-
 	}
+	
 
 	private async executePage(callback: () => void | Promise<any>): Promise<UserInfo | any> {
 		try {
@@ -91,164 +100,125 @@ export class FerrumUser {
 	private async getUserInfo(): Promise<UserInfo | any> {
 		return await this.executePage(async () => {
 			await this.currentPage.goto(CURRENT_PAGE + "user/profile.php");
+	
 			const userData = await this.currentPage.evaluate(() => {
-				// Obtenemos los intereses del usuario.
-				let interestsList: Array<string> = [];
-				document.querySelectorAll<HTMLDataListElement>(".tag_list .inline-list li").forEach((li) => {
-					interestsList.push(li.innerText);
-				});
-
-				return {
-					fullname: document.querySelector<HTMLDivElement>(".fullname span").innerText || "",
-					email: document.querySelector<HTMLDivElement>(".email dd").innerText || "",
-					city: document.querySelector<HTMLDivElement>(".city dd").innerText || "",
-					interests: interestsList,
-					id: document.querySelector<HTMLDivElement>(".idnumber dd").innerText || "",  
-				};
+				const interestsList = Array.from(document.querySelectorAll<HTMLDataListElement>(".tag_list .inline-list li")).map(li => li.innerText.trim());
+				const fullname = (document.querySelector(".fullname span") as HTMLElement)?.innerText || "";
+				const email = (document.querySelector(".email dd") as HTMLElement)?.innerText || "";
+				const city = (document.querySelector(".city dd") as HTMLElement)?.innerText || "";
+				const id = (document.querySelector(".idnumber dd") as HTMLElement)?.innerText || "";
+	
+				return { fullname, email, city, interests: interestsList, id };
 			});
-
-			// Asignamos código de estudiante.
-			this.studentCode = userData.id
-
-			// Accedemos a la sección de carreras.
-			await this.currentPage.click('[for="coursedetails"]');
-			const coursesData = await this.currentPage.evaluate(() => {
-				// Obtenemos sus carreras.
-				let coursesList: Array<string> = [];
-				let coursesElements = document.querySelectorAll<HTMLDataListElement>(".coursedetails li")
-				if (coursesElements) {
-					// Removemos el primer elemento que es una cadena conjunta.
-					const arrayCourses = Array.from(coursesElements)
-					arrayCourses.slice(1).forEach((c) => {
-						if (c?.innerText.includes("CLASE")) {
-							coursesList.push(c.innerText);
-						}
-					})
-				}
-				return { courses: coursesList };
-			});
-
-			await this.currentPage.click('[for="more"]');
-			const accessData = await this.currentPage.evaluate(() => {
-				return {
-					firstAccess: document.querySelector<HTMLDivElement>(".firstaccess dd").innerText || "",
-					lastAccess: document.querySelector<HTMLDivElement>(".lastaccess dd").innerText || "",
-				};
-			});
-
-			// Retornamos la información del usuario.
-			return {
-				...userData,
-				...coursesData,
-				...accessData
-			}
-		})
+	
+			this.studentCode = userData.id;
+	
+			await Promise.all([
+				this.currentPage.click('[for="coursedetails"]'),
+				this.currentPage.click('[for="more"]')
+			]);
+	
+			const [coursesData, accessData] = await Promise.all([
+				this.currentPage.evaluate(() => {
+					const coursesList = Array.from(document.querySelectorAll<HTMLDataListElement>(".coursedetails li"))
+						.slice(1)
+						.filter(c => c.innerText.includes("CLASE"))
+						.map(c => c.innerText);
+	
+					return { courses: coursesList };
+				}),
+				this.currentPage.evaluate(() => {
+					const firstAccess = (document.querySelector(".firstaccess dd") as HTMLElement)?.innerText || "";
+					const lastAccess = (document.querySelector(".lastaccess dd") as HTMLElement)?.innerText || "";
+					
+					return { firstAccess, lastAccess };
+				})
+			]);
+	
+			return { ...userData, ...coursesData, ...accessData };
+		});
 	}
+	
 
 	/**
 	 * Get all information about homeworks from the user in the ferrum app.
 	 * @returns Array of the homeworks
 	*/
-	private async getAllData(): Promise<Array<Homework[]>> {
+	private async getAllData(): Promise<{ homeworks: Homework[], autoReviews: Homework[] }> {
 		return await this.executePage(async () => {
 			await this.currentPage.goto(CURRENT_PAGE + "calendar/view.php");
-			const Data = this.currentPage.evaluate(() => {
-				const homeworks: Array<Homework> = []
-				const autoReviews: Array<Homework> = []
+			const { homeworks, autoReviews } = await this.currentPage.evaluate(() => {
+				const homeworks: Homework[] = [];
+				const autoReviews: Homework[] = [];
+	
 				document.querySelectorAll(".event").forEach((e) => {
-
-					function optimizeText(text: string) {
-						// Eliminar líneas en blanco adicionales
-						text = text.replace(/^\s*[\r\n]/gm, '');
-						// Reemplazar múltiples espacios en blanco por uno solo
-						text = text.replace(/\s{2,}/g, ' ');
-						return text;
-					}
-
-					function getContainerInformation(container: NodeListOf<Element>, isQuery: boolean, position: number, tag: string): string {
-						return isQuery === false
-						? container[position].querySelectorAll<HTMLDivElement>(tag)[1].innerText
-						: container[container.length - 1].querySelector<HTMLDivElement>(tag).innerText
-					}
-
-					// Esquema de la tarea.
+					const title = e.querySelector(".name").innerHTML;
+					const descriptionContent = e.querySelector<HTMLDivElement>(".description-content");
+					const description = descriptionContent?.innerText.trim() || '';
+	
+					const containerInfo = e.querySelector(".description").querySelectorAll(".row");
+	
+					const sendDate = containerInfo[0].querySelectorAll("div")[1].innerText;
+					const status = containerInfo[1].querySelectorAll("div")[1].innerText;
+					const course = containerInfo[containerInfo.length - 1].querySelector("a").innerText;
+					const id = e.querySelector<HTMLAreaElement>(".card-footer a")?.href.match(/\d+/g)?.join('');
+	
 					const homework: Homework = {
-						title: "",
-						course: "",
-						sendDate: "",
-						status: "",
-						description: "",
-						type: "Tarea",
-						id: ""
-					}
-
-					// Obtenemos la información del contenedor de las tareas.
-					const containerInfo = e.querySelector(".description").querySelectorAll(".row")
-					homework.title = e.querySelector(".name").innerHTML
-					homework.sendDate = getContainerInformation(containerInfo, false, 0, "div") //containerInfo[0].querySelectorAll("div")[1].innerText
-					homework.status = getContainerInformation(containerInfo, false, 1, "div") //containerInfo[1].querySelectorAll("div")[1].innerText
-					homework.course = getContainerInformation(containerInfo, true, 0, "a") //containerInfo[containerInfo.length - 1].querySelector("a").innerText
-					homework.description = e.querySelector<HTMLDivElement>(".description-content")?.innerText
-					homework.id = e.querySelector<HTMLAreaElement>(".card-footer a")?.href
-
-					//* Ajustamos la id para que solo sean los números.
-					homework.id = homework.id.match(/\d+/g).join("");
-
-
-					//* Aplicamos la tarea según su tipo.
-					if (homework.title.includes("Auto-Evaluación")) {
-						homework.type = "Auto Evaluación"
-					}
-
-					//* Formateamos la descripción si existe.
-					if (homework.description) {
-						homework.description = optimizeText(homework.description)
-					}
-
+						title,
+						course,
+						sendDate,
+						status,
+						description,
+						type: title.includes("Auto-Evaluación") ? "Auto Evaluación" : "Tarea",
+						id: id || ""
+					};
+	
 					if (homework.type === "Tarea") {
-						homeworks.push(homework)
-					} else if (homework.type === "Auto Evaluación") {
-						autoReviews.push(homework)
+						homeworks.push(homework);
+					} else {
+						autoReviews.push(homework);
 					}
-
-				})
-				return [homeworks, autoReviews]
-			})
-			return Data
-		})
-	}
+				});
+	
+				return { homeworks, autoReviews };
+			});
+	
+			return { homeworks, autoReviews };
+		});
+	}	
 
 	/**
 	 * 
 	 * @param homeworks A homeworks array with additional data.
-	 * @returns 
+	 * @returns Array with the homeworks find.
 	 */
 	private async setStateOnHomeworks(): Promise<Array<Homework>> {
 		return await this.executePage(async () => {
+			// Filtramos las tareas y creamos un array donde Iran las mismas con su estado.
 			const allTasks = this.homeworks.filter((task) => task.type === "Tarea");
 			const allTasksWithStatus = [];
 	
 			for (const task of allTasks) {
+				// Accedemos a la pagina de la tarea
 				await this.currentPage.goto(HOMEWORK_PAGE + task.id);
 				const updatedTask = await this.currentPage.evaluate((task) => {
+					// Obtenemos los datos del contenedor entre muchos otros.
 					const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
 					const statusSend = containerInfo[0].querySelector("td").innerText;
-					if (!statusSend) {
-						task.statusSend = "Desconocido";
-					} else {
-						task.statusSend = statusSend as TaskStatus;
-					}
+					task.statusSend = statusSend as TaskStatus
 					task.taskScore = containerInfo[1].querySelector("td").innerText;
 					task.timeLeft = containerInfo[3].querySelector("td").innerText;
 					task.lastModification = containerInfo[4].querySelector("td").innerText;
 
 					return task;
 				}, task);
+				// Agregamos la tarea al array con su estado.
 				allTasksWithStatus.push(updatedTask);
 			}
 			return allTasksWithStatus;
 		});
 	}
+	
 
 	/**
 	 * Get all homeworks in differents parametters.
@@ -275,41 +245,55 @@ export class FerrumUser {
 		return allHomeworksWithStatus
 	}
 
+	/**
+	 * Return all Information about the homework with your id.
+	 * @param id ID of the homework in the ferrum app.
+	 * @returns Homework with all data.
+	 */
 	public async getHomeworkInfo(id: string): Promise<Homework> {
+		// Accedemos a la pagina de la tarea.
 		await this.currentPage.goto(HOMEWORK_PAGE + id);
 
-		const homeworkData: Homework = await this.currentPage.evaluate((id) => {
+		const homeworkData: Homework = await this.currentPage.evaluate((id, DEFAULT_HOMEWORK) => {
 
 			const homework: Homework = {
 				id: id,
-				title: "",
-				type: "Tarea",
-				course: "",
-				taskScore: "",
-				sendDate: "",
-				timeLeft: "",
-				statusSend: "Desconocido",
-				lastModification: ""
+				...DEFAULT_HOMEWORK
 			}
 			
-			homework.title = document.querySelector<HTMLDivElement>("[role=main] h2").innerText
-			homework.course = document.querySelectorAll<HTMLDivElement>(".breadcrumb li")[1].innerText
-			const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
-			const statusSend = containerInfo[0].querySelector("td").innerText;
-			if (!statusSend) {
-				homework.statusSend = "Desconocido";
-			} else {
+			// Obtenemos los datos como el titulo, curso, etc.
+			const mainHeading = document.querySelector<HTMLDivElement>("[role=main] h2");
+			const breadcrumbElements = document.querySelectorAll<HTMLDivElement>(".breadcrumb li");
+			const generalTableRows = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
+
+			if (mainHeading && breadcrumbElements.length >= 2 && generalTableRows.length >= 5) {
+				homework.title = mainHeading.innerText;
+				homework.course = breadcrumbElements[1].innerText;
+				homework.taskScore = generalTableRows[1].querySelector("td").innerText;
+				homework.sendDate = generalTableRows[2].querySelector("td").innerText;
+				homework.timeLeft = generalTableRows[3].querySelector("td").innerText;
+				homework.lastModification = generalTableRows[4].querySelector("td").innerText;
+				const statusSend = generalTableRows[0].querySelector("td").innerText;
 				homework.statusSend = statusSend as TaskStatus;
 			}
-			homework.taskScore = containerInfo[1].querySelector("td").innerText;
-			homework.sendDate = document.querySelectorAll<HTMLDivElement>(".generaltable tr td")[2].innerText
-			homework.timeLeft = containerInfo[3].querySelector("td").innerText;
-			homework.lastModification = containerInfo[4].querySelector("td").innerText;
 
 			return homework
-		}, id);
+		}, id, DEFAULT_HOMEWORK);
 
 		return homeworkData
+	}
+
+	/**
+	 * Close the session of the user.
+	 */
+	public async closeSession() {
+		console.log("Cerrando sesión...")
+		this.loginData = null
+		this.homeworks = []
+		this.autoReviews = []
+		this.userInfo = null
+		this.studentCode = ""
+		this.currentPage.close()
 	}
 }
 

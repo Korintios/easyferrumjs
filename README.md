@@ -55,4 +55,5 @@ fetchUserInfo()
 | **userInfo**    | Método | Obtener toda la información relevante sobre tu usuario en la plataforma.   |
 | **getHomeworks**    | Método | Obtener todas las tareas parametrizadas disponibles dentro de la plataforma ferrum.   |
 | **getHomeworkInfo**    | Método | Obtener información de una tarea en especifico.   |
+| **closeSession**    | Método | Cerrar la sesión del usuario.   |
 

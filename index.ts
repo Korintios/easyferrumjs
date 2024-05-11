@@ -25,8 +25,12 @@ async function fetchUserInfo() {
         console.log(allTasks)
 
         // Obtenemos el estado de alguna tarea.
-        const task = await ferrumUser.getHomeworkInfo("1370701")
+        const task = await ferrumUser.getHomeworkInfo("1415023")
         console.log(task)
+
+        // Cerramos Sesión.
+        await ferrumUser.closeSession()
+        return
     } catch (error) {
         console.error("Error in FerrumJS", error);
     }
