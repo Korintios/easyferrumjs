@@ -1,5 +1,5 @@
 import puppeteer, { Page } from "puppeteer";
-import { ferrumTaskType, Homework, TaskStatus } from "../types/Homework";
+import { FerrumTaskType, Homework, TaskStatus } from "../types/Homework";
 import { UserInfo } from "../types/UserInfo";
 import { LoginData } from "../types/LoginData";
 
@@ -192,7 +192,7 @@ export class FerrumUser {
 	 * @param homeworks A homeworks array with additional data.
 	 * @returns Array with the homeworks find.
 	 */
-	private async setStateOn(on: ferrumTaskType): Promise<Array<Homework>> {
+	private async setStateOn(on: FerrumTaskType): Promise<Array<Homework>> {
 		return await this.executePage(async () => {
 			switch (on) {
 				case "Task":
@@ -211,7 +211,6 @@ export class FerrumUser {
 							task.taskScore = containerInfo[1].querySelector("td").innerText;
 							task.timeLeft = containerInfo[3].querySelector("td").innerText;
 							task.lastModification = containerInfo[4].querySelector("td").innerText;
-
 							return task;
 						}, task);
 						// Agregamos la tarea al array con su estado.
@@ -228,7 +227,7 @@ export class FerrumUser {
 						const updatedTask = await this.currentPage.evaluate((autoReview) => {
 							// Obtenemos los datos del contenedor entre muchos otros.
 							const isSend = document.getElementsByClassName("quizattemptsummary");
-							autoReview.statusSend = isSend.length != 0 ? "Send" : "Not Send"
+							autoReview.statusSend = isSend.length != 0 ? "Enviado para calificar" : "No entregado"
 							return autoReview;
 						}, autoReview);
 						// Agregamos la autoevaluación al array con su estado.
@@ -245,7 +244,7 @@ export class FerrumUser {
 	 * @param filter Filter depends the homeworks you will get.
 	 * @returns 
 	 */
-	public async getInfo(on: ferrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
+	public async getInfo(on: FerrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
 		return await this.executePage(async () => {
 			let filteredInfo: Array<Homework> = [];
 	
@@ -268,15 +267,15 @@ export class FerrumUser {
 	 * @param filter The filter of the data
 	 * @returns 
 	 */
-	private async filterInfo(taskType: ferrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
+	private async filterInfo(taskType: FerrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
 		return await this.executePage(async () => {
 			const infoWithStatus = await this.setStateOn(taskType);
 	
 			switch (filter) {
 				case "Pending":
-					return infoWithStatus.filter(task => task.statusSend === "Not Send");
+					return infoWithStatus.filter(task => task.statusSend === "No entregado");
 				case "Send":
-					return infoWithStatus.filter(task => task.statusSend === "Send");
+					return infoWithStatus.filter(task => task.statusSend === "Enviado para calificar");
 				default:
 					return infoWithStatus;
 			}

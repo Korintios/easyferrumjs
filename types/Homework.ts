@@ -1,6 +1,7 @@
 type ferrumString = string
-export type ferrumTaskType = "Task" | "Self Evaluation"
-export type TaskStatus = "Send" | "Not Send" | "Unknown"
+export type FerrumTaskType = "Task" | "Self Evaluation"
+export type TaskStatus = "Enviado para calificar" | "No entregado" | "Unknown"
+
 
 
 export interface Homework {
@@ -10,7 +11,7 @@ export interface Homework {
     sendDate: ferrumString
     status?: ferrumString
     description?: ferrumString
-    type: ferrumTaskType
+    type: FerrumTaskType
     timeLeft?: ferrumString
     taskScore?: ferrumString
     statusSend?: TaskStatus
