@@ -1,6 +1,6 @@
 type ferrumString = string
-type ferrumTaskType = "Tarea" | "Evaluación" | "Auto Evaluación"
-export type TaskStatus = "Enviado para calificar" | "No entregado" | "Desconocido"
+export type ferrumTaskType = "Task" | "Self Evaluation"
+export type TaskStatus = "Send" | "Not Send" | "Unknown"
 
 
 export interface Homework {

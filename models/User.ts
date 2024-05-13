@@ -1,5 +1,5 @@
 import puppeteer, { Page } from "puppeteer";
-import { Homework, TaskStatus } from "../types/Homework";
+import { ferrumTaskType, Homework, TaskStatus } from "../types/Homework";
 import { UserInfo } from "../types/UserInfo";
 import { LoginData } from "../types/LoginData";
 
@@ -10,12 +10,12 @@ type FerrumPage = Page | undefined
 
 const DEFAULT_HOMEWORK: Homework = {
 	title: "",
-	type: "Tarea",
+	type: "Task",
 	course: "",
 	taskScore: "",
 	sendDate: "",
 	timeLeft: "",
-	statusSend: "Desconocido",
+	statusSend: "Unknown",
 	lastModification: ""
 }
 
@@ -169,11 +169,11 @@ export class FerrumUser {
 						sendDate,
 						status,
 						description,
-						type: title.includes("Auto-Evaluación") ? "Auto Evaluación" : "Tarea",
+						type: title.includes("Auto-Evaluación") ? "Self Evaluation" : "Task",
 						id: id || ""
 					};
 	
-					if (homework.type === "Tarea") {
+					if (homework.type === "Task") {
 						homeworks.push(homework);
 					} else {
 						autoReviews.push(homework);
@@ -192,57 +192,95 @@ export class FerrumUser {
 	 * @param homeworks A homeworks array with additional data.
 	 * @returns Array with the homeworks find.
 	 */
-	private async setStateOnHomeworks(): Promise<Array<Homework>> {
+	private async setStateOn(on: ferrumTaskType): Promise<Array<Homework>> {
 		return await this.executePage(async () => {
-			// Filtramos las tareas y creamos un array donde Iran las mismas con su estado.
-			const allTasks = this.homeworks.filter((task) => task.type === "Tarea");
-			const allTasksWithStatus = [];
-	
-			for (const task of allTasks) {
-				// Accedemos a la pagina de la tarea
-				await this.currentPage.goto(HOMEWORK_PAGE + task.id);
-				const updatedTask = await this.currentPage.evaluate((task) => {
-					// Obtenemos los datos del contenedor entre muchos otros.
-					const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
-					const statusSend = containerInfo[0].querySelector("td").innerText;
-					task.statusSend = statusSend as TaskStatus
-					task.taskScore = containerInfo[1].querySelector("td").innerText;
-					task.timeLeft = containerInfo[3].querySelector("td").innerText;
-					task.lastModification = containerInfo[4].querySelector("td").innerText;
+			switch (on) {
+				case "Task":
+					// Filtramos las tareas y creamos un array donde Iran las mismas con su estado.
+					const allTasks = this.homeworks.filter((task) => task.type === "Task");
+					const allTasksWithStatus = [];
 
-					return task;
-				}, task);
-				// Agregamos la tarea al array con su estado.
-				allTasksWithStatus.push(updatedTask);
+					for (const task of allTasks) {
+						// Accedemos a la pagina de la tarea
+						await this.currentPage.goto(HOMEWORK_PAGE + task.id);
+						const updatedTask = await this.currentPage.evaluate((task) => {
+							// Obtenemos los datos del contenedor entre muchos otros.
+							const containerInfo = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
+							const statusSend = containerInfo[0].querySelector("td").innerText;
+							task.statusSend = statusSend as TaskStatus
+							task.taskScore = containerInfo[1].querySelector("td").innerText;
+							task.timeLeft = containerInfo[3].querySelector("td").innerText;
+							task.lastModification = containerInfo[4].querySelector("td").innerText;
+
+							return task;
+						}, task);
+						// Agregamos la tarea al array con su estado.
+						allTasksWithStatus.push(updatedTask);
+					}
+					return allTasksWithStatus;
+				case "Self Evaluation":
+					const allAutoReviews = this.autoReviews.filter((autoReview) => autoReview.type === "Self Evaluation")
+					const allAutoReviewsWithStatus = [];
+
+					for (const autoReview of allAutoReviews) {
+						// Accedemos a la pagina de la tarea
+						await this.currentPage.goto(QUIZ_PAGE + autoReview.id);
+						const updatedTask = await this.currentPage.evaluate((autoReview) => {
+							// Obtenemos los datos del contenedor entre muchos otros.
+							const isSend = document.getElementsByClassName("quizattemptsummary");
+							autoReview.statusSend = isSend.length != 0 ? "Send" : "Not Send"
+							return autoReview;
+						}, autoReview);
+						// Agregamos la autoevaluación al array con su estado.
+						allAutoReviewsWithStatus.push(updatedTask);
+					}
+					return allAutoReviewsWithStatus
 			}
-			return allTasksWithStatus;
 		});
 	}
 	
 
 	/**
-	 * Get all homeworks in differents parametters.
+	 * Get all homeworks in different parameters.
 	 * @param filter Filter depends the homeworks you will get.
 	 * @returns 
 	 */
-	public async getHomeworks(filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
-		// Obtener todos los deberes con su estado actualizado
-		const allHomeworksWithStatus = await this.setStateOnHomeworks();
-		
-		let filteredHomeworks: Array<Homework> = [];
+	public async getInfo(on: ferrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
+		return await this.executePage(async () => {
+			let filteredInfo: Array<Homework> = [];
 	
-		// Filtrar los deberes según el filtro especificado
-		if (filter === "Pending") {
-			// Filtrar deberes pendientes
-			filteredHomeworks = allHomeworksWithStatus.filter(task => task.statusSend === "No entregado");
-			return filteredHomeworks
-		} else if (filter === "Send") {
-			// Filtrar deberes enviados para calificar
-			filteredHomeworks = allHomeworksWithStatus.filter(task => task.statusSend === "Enviado para calificar");
-			return filteredHomeworks
-		}
-
-		return allHomeworksWithStatus
+			switch (on) {
+				case "Task":
+					filteredInfo = await this.filterInfo("Task", filter);
+					break;
+				case "Self Evaluation":
+					filteredInfo = await this.filterInfo("Self Evaluation", filter);
+					break;
+			}
+		
+			return filteredInfo;
+		})
+	}
+	
+	/**
+	 * Filter the data about the user in the session.
+	 * @param taskType The type of info 
+	 * @param filter The filter of the data
+	 * @returns 
+	 */
+	private async filterInfo(taskType: ferrumTaskType, filter: "All" | "Pending" | "Send"): Promise<Array<Homework>> {
+		return await this.executePage(async () => {
+			const infoWithStatus = await this.setStateOn(taskType);
+	
+			switch (filter) {
+				case "Pending":
+					return infoWithStatus.filter(task => task.statusSend === "Not Send");
+				case "Send":
+					return infoWithStatus.filter(task => task.statusSend === "Send");
+				default:
+					return infoWithStatus;
+			}
+		})
 	}
 
 	/**
@@ -251,36 +289,38 @@ export class FerrumUser {
 	 * @returns Homework with all data.
 	 */
 	public async getHomeworkInfo(id: string): Promise<Homework> {
-		// Accedemos a la pagina de la tarea.
-		await this.currentPage.goto(HOMEWORK_PAGE + id);
+		return await this.executePage(async () => {
+			// Accedemos a la pagina de la tarea.
+			await this.currentPage.goto(HOMEWORK_PAGE + id);
 
-		const homeworkData: Homework = await this.currentPage.evaluate((id, DEFAULT_HOMEWORK) => {
+			const homeworkData: Homework = await this.currentPage.evaluate((id, DEFAULT_HOMEWORK) => {
 
-			const homework: Homework = {
-				id: id,
-				...DEFAULT_HOMEWORK
-			}
-			
-			// Obtenemos los datos como el titulo, curso, etc.
-			const mainHeading = document.querySelector<HTMLDivElement>("[role=main] h2");
-			const breadcrumbElements = document.querySelectorAll<HTMLDivElement>(".breadcrumb li");
-			const generalTableRows = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
+				const homework: Homework = {
+					id: id,
+					...DEFAULT_HOMEWORK
+				}
+				
+				// Obtenemos los datos como el titulo, curso, etc.
+				const mainHeading = document.querySelector<HTMLDivElement>("[role=main] h2");
+				const breadcrumbElements = document.querySelectorAll<HTMLDivElement>(".breadcrumb li");
+				const generalTableRows = document.querySelectorAll<HTMLDivElement>(".generaltable tr");
 
-			if (mainHeading && breadcrumbElements.length >= 2 && generalTableRows.length >= 5) {
-				homework.title = mainHeading.innerText;
-				homework.course = breadcrumbElements[1].innerText;
-				homework.taskScore = generalTableRows[1].querySelector("td").innerText;
-				homework.sendDate = generalTableRows[2].querySelector("td").innerText;
-				homework.timeLeft = generalTableRows[3].querySelector("td").innerText;
-				homework.lastModification = generalTableRows[4].querySelector("td").innerText;
-				const statusSend = generalTableRows[0].querySelector("td").innerText;
-				homework.statusSend = statusSend as TaskStatus;
-			}
+				if (mainHeading && breadcrumbElements.length >= 2 && generalTableRows.length >= 5) {
+					homework.title = mainHeading.innerText;
+					homework.course = breadcrumbElements[1].innerText;
+					homework.taskScore = generalTableRows[1].querySelector("td").innerText;
+					homework.sendDate = generalTableRows[2].querySelector("td").innerText;
+					homework.timeLeft = generalTableRows[3].querySelector("td").innerText;
+					homework.lastModification = generalTableRows[4].querySelector("td").innerText;
+					const statusSend = generalTableRows[0].querySelector("td").innerText;
+					homework.statusSend = statusSend as TaskStatus;
+				}
 
-			return homework
-		}, id, DEFAULT_HOMEWORK);
+				return homework
+			}, id, DEFAULT_HOMEWORK);
 
-		return homeworkData
+			return homeworkData
+		})
 	}
 
 	/**

@@ -1,6 +1,6 @@
 {
   "name": "easyferrumjs",
-  "version": "0.7.0",
+  "version": "0.9.0",
   "description": "Get easy information about the application web ferrum.",
   "main": "dist/index.js",
   "author": "Develop with Milo",
